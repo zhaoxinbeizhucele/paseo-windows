@@ -1,0 +1,125 @@
+name: Patched Windows release
+
+on:
+  schedule:
+    - cron: '23 1 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['config.json', 'patches/**', 'scripts/**', '.github/workflows/windows.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: patched-windows-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.plan.outputs.needed }}
+      upstreamSha: ${{ steps.plan.outputs.upstreamSha }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test
+      - id: plan
+        run: node scripts/plan.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-plan
+          path: plan.json
+          retention-days: 7
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.needed == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-plan
+      - uses: actions/checkout@v4
+        with:
+          repository: getpaseo/paseo
+          ref: ${{ needs.plan.outputs.upstreamSha }}
+          path: .upstream
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: .upstream/package-lock.json
+      - name: Apply pinned patch and configure personal updater
+        run: node scripts/prepare.mjs .upstream
+      - name: Install upstream dependencies
+        working-directory: .upstream
+        run: node scripts/npm-retry.mjs ci
+        env:
+          LEFTHOOK: '0'
+      - name: File-link regression tests
+        working-directory: .upstream/packages/app
+        run: npx vitest run --project unit src/assistant-file-links/parse.test.ts src/assistant-file-links/path-open.test.ts src/file-explorer/preview-target.test.ts src/screens/workspace/workspace-file-open-command.test.ts
+      - name: Build and smoke-test Windows x64 installer
+        working-directory: .upstream
+        run: npm run build:desktop -- --publish never --win --x64
+        env:
+          PASEO_DESKTOP_SMOKE: '1'
+          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          NODE_OPTIONS: --max-old-space-size=6144
+      - name: Typecheck app
+        working-directory: .upstream
+        run: npm run typecheck --workspace=@getpaseo/app
+      - name: Verify and collect release assets
+        run: node scripts/collect.mjs .upstream
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release/*
+          retention-days: 14
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-diagnostics
+          path: |
+            ${{ runner.temp }}/desktop-smoke
+            .upstream/packages/desktop/release/builder-debug.yml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release
+      - name: Verify uploaded assets
+        working-directory: release
+        run: sha256sum --check SHA256SUMS.txt
+      - name: Publish complete release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Paseo Windows $TAG" --notes-file release/RELEASE-NOTES.md --draft
+          fi
+          gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release/RELEASE-NOTES.md --draft=false --latest

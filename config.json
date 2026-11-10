@@ -1,0 +1,12 @@
+{
+  "upstream": "getpaseo/paseo",
+  "repository": "zhaoxinbeizhucele/paseo-windows",
+  "revision": 1,
+  "patches": [
+    {
+      "file": "patches/7711-windows-drive-links.patch",
+      "commit": "1f49732c635c0138f61e9d95be4b03ea35239722",
+      "url": "https://github.com/getpaseo/paseo/pull/7711"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "paseo-windows-builds",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test scripts/common.test.mjs"
+  }
+}

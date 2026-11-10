@@ -1,0 +1,103 @@
+From 1f49732c635c0138f61e9d95be4b03ea35239722 Mon Sep 17 00:00:00 2001
+From: "paseo-bot[bot]" <266920839+paseo-bot[bot]@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 14:49:49 +0200
+Subject: [PATCH] fix(app): open slash-prefixed Windows drive links
+
+Normalize a slash before the drive only when the workspace identifies Windows path syntax. Otherwise the file preview selects a POSIX root and loses the workspace scope. Keep POSIX paths and existing decoding and line parsing intact.
+---
+ .../src/assistant-file-links/parse.test.ts    | 42 +++++++++++++++++++
+ .../app/src/assistant-file-links/parse.ts     | 12 +++++-
+ 2 files changed, 52 insertions(+), 2 deletions(-)
+
+diff --git a/packages/app/src/assistant-file-links/parse.test.ts b/packages/app/src/assistant-file-links/parse.test.ts
+index 3390d0cfa9c..e61fd2905fb 100644
+--- a/packages/app/src/assistant-file-links/parse.test.ts
++++ b/packages/app/src/assistant-file-links/parse.test.ts
+@@ -1,4 +1,6 @@
+ import { describe, expect, it } from "vitest";
++import { resolveFilePreviewReadTarget } from "@/file-explorer/preview-target";
++import { resolveWorkspaceFilePaths } from "@/workspace/file-open";
+ import {
+   classifyAssistantFileLink,
+   normalizeInlinePathTarget,
+@@ -611,3 +613,43 @@ describe("encoded filename line markers", () => {
+     },
+   );
+ });
++
++describe("slash-prefixed drive links in Windows workspaces", () => {
++  it.each([
++    ["/E:/demo/repo/tools/tool.vbs", "E:/demo/repo/tools/tool.vbs", undefined],
++    ["/E:/demo/repo/docs/my%20file.md#L12", "E:/demo/repo/docs/my file.md", 12],
++    ["/E:/demo/repo/docs/guide.md:12", "E:/demo/repo/docs/guide.md", 12],
++    ["E:/demo/repo/tools/tool.vbs", "E:/demo/repo/tools/tool.vbs", undefined],
++    ["file:///E:/demo/repo/tools/tool.vbs", "E:/demo/repo/tools/tool.vbs", undefined],
++  ])("resolves %s to the workspace read target", (href, path, lineStart) => {
++    const workspaceRoot = "E:\\demo\\repo";
++    const target = parseAssistantFileLink(href, {
++      workspaceRoot,
++      decodeHref: true,
++      explicitLink: true,
++    });
++    expect(target).toMatchObject({ raw: href, path });
++    expect(target?.lineStart).toBe(lineStart);
++    expect(resolveFilePreviewReadTarget({ path: target!.path, workspaceRoot })).toEqual({
++      cwd: workspaceRoot,
++      path,
++    });
++    expect(resolveWorkspaceFilePaths({ path: target!.path, workspaceRoot })).toEqual({
++      absolutePath: path,
++      relativePath: path.slice("E:/demo/repo/".length),
++    });
++  });
++
++  it.each(["/home/demo/repo", undefined])(
++    "preserves POSIX paths with workspace %s",
++    (workspaceRoot) => {
++      expect(
++        parseAssistantFileLink("/E:/demo/repo/tools/tool.vbs", {
++          workspaceRoot,
++          decodeHref: true,
++          explicitLink: true,
++        })?.path,
++      ).toBe("/E:/demo/repo/tools/tool.vbs");
++    },
++  );
++});
+diff --git a/packages/app/src/assistant-file-links/parse.ts b/packages/app/src/assistant-file-links/parse.ts
+index 8e02310fea4..38184f17331 100644
+--- a/packages/app/src/assistant-file-links/parse.ts
++++ b/packages/app/src/assistant-file-links/parse.ts
+@@ -260,7 +260,7 @@ export function parseAssistantFileLink(
+     return fileUrlTarget;
+   }
+ 
+-  const trimmed = value?.trim();
++  const trimmed = normalizeWindowsLinkPath(value?.trim(), options.workspaceRoot);
+   if (!trimmed) {
+     return null;
+   }
+@@ -271,7 +271,7 @@ export function parseAssistantFileLink(
+ 
+   const inlinePathTarget = parseAssistantInlinePathLink(trimmed, options);
+   if (inlinePathTarget) {
+-    return inlinePathTarget;
++    return { ...inlinePathTarget, raw: value };
+   }
+ 
+   const windowsTarget = parseWindowsFileLink(trimmed, value, options);
+@@ -350,6 +350,14 @@ export function isFileLookingAssistantToken(value: string): boolean {
+   return isPlausibleAssistantLocalPath(path);
+ }
+ 
++// A drive-based workspace identifies the target host's path syntax, even when
++// the client runs elsewhere. Preserve the same spelling on POSIX hosts.
++function normalizeWindowsLinkPath(value: string, workspaceRoot?: string): string {
++  return /^[A-Za-z]:[\\/]/.test(workspaceRoot?.trim() ?? "") && /^\/[A-Za-z]:[\\/]/.test(value)
++    ? value.slice(1)
++    : value;
++}
++
+ function parseWindowsFileLink(
+   trimmed: string,
+   raw: string,
