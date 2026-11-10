@@ -53,6 +53,15 @@ for (const workspace of ['', ...rootPackage.workspaces]) {
 }
 writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
 
+// Expo evaluates native version codes even for a desktop-only web export.
+// Personal desktop patch numbers can exceed native's 999-component limit.
+const appConfigPath = resolve(source, 'packages/app/app.config.js');
+const appConfig = readFileSync(appConfigPath, 'utf8');
+const nativeVersionLine = 'const nativeReleaseVersion = getNativeReleaseVersion(pkg.version);';
+if (appConfig.split(nativeVersionLine).length !== 2) throw new Error('Native version configuration changed; review required');
+writeFileSync(appConfigPath, appConfig.replace(nativeVersionLine,
+  `// Personal Windows build: native-only version codes retain the upstream version.\nconst nativeReleaseVersion = getNativeReleaseVersion(${JSON.stringify(plan.upstreamTag.slice(1))});`));
+
 const builderPath = resolve(source, 'packages/desktop/electron-builder.yml');
 let builder = readFileSync(builderPath, 'utf8');
 const originalFeed = /publish:\r?\n  provider: github\r?\n  owner: getpaseo\r?\n  repo: paseo(?=\r?\n)/g;
