@@ -126,6 +126,7 @@ jobs:
 
   notify:
     needs: [plan, publish]
+    if: always() && !cancelled() && needs.plan.result == 'success' && (needs.publish.result == 'success' || needs.plan.outputs.needed == 'false')
     runs-on: ubuntu-latest
     permissions:
       contents: read
