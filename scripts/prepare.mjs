@@ -32,10 +32,26 @@ const patches = config.patches.map(patch => {
   console.log(`${patch.file}: ${state}`);
   return { ...patch, sha256, state };
 });
-const packagePath = resolve(source, 'packages/desktop/package.json');
-const desktop = JSON.parse(readFileSync(packagePath, 'utf8'));
-desktop.version = plan.version;
-writeFileSync(packagePath, `${JSON.stringify(desktop, null, 2)}\n`);
+// The managed daemon and app must report the same personal build version.
+const rootPackagePath = resolve(source, 'package.json');
+const rootPackage = JSON.parse(readFileSync(rootPackagePath, 'utf8'));
+rootPackage.version = plan.version;
+writeFileSync(rootPackagePath, `${JSON.stringify(rootPackage, null, 2)}\n`);
+const sync = spawnSync(process.execPath, ['scripts/sync-workspace-versions.mjs'], { cwd: source, encoding: 'utf8' });
+if (sync.status !== 0) throw new Error(sync.stderr || 'Workspace version sync failed');
+const lockPath = resolve(source, 'package-lock.json');
+const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+lock.version = plan.version;
+for (const workspace of ['', ...rootPackage.workspaces]) {
+  const pkg = JSON.parse(readFileSync(resolve(source, workspace, 'package.json'), 'utf8'));
+  const locked = lock.packages[workspace];
+  if (!locked) throw new Error(`Missing workspace lock entry: ${workspace}`);
+  locked.version = pkg.version;
+  for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    if (pkg[section]) locked[section] = pkg[section];
+  }
+}
+writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
 
 const builderPath = resolve(source, 'packages/desktop/electron-builder.yml');
 let builder = readFileSync(builderPath, 'utf8');
