@@ -18,13 +18,16 @@ export function buildVersion(tag, revision) {
   return `${major}.${minor}.${encodedPatch}`;
 }
 
-export async function github(path, { optional404 = false } = {}) {
+export async function github(path, { optional404 = false, method = 'GET', body } = {}) {
   const response = await fetch(`https://api.github.com/${path}`, {
+    method,
     headers: {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(process.env.GH_TOKEN ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {}),
     },
+    ...(body ? { body: JSON.stringify(body) } : {}),
     signal: AbortSignal.timeout(60000),
   });
   if (optional404 && response.status === 404) return null;

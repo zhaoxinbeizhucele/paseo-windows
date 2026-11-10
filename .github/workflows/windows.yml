@@ -123,3 +123,39 @@ jobs:
           fi
           gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release/RELEASE-NOTES.md --draft=false --latest
+
+  notify:
+    needs: [plan, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Send deduplicated GitHub update reminder
+        run: node scripts/notify.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+
+  maintain:
+    needs: plan
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-plan
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Keep daily schedule active with a monthly repository check-in
+        run: node scripts/maintain.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
