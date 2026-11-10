@@ -23,6 +23,11 @@ const installerBytes = readFileSync(resolve(output, installer));
 if (!entry || entry.sha512 !== createHash('sha512').update(installerBytes).digest('base64')) {
   throw new Error('Updater manifest installer checksum mismatch');
 }
+// Upstream can aggregate explicit per-target architectures even with --x64.
+// Publish only references to installers actually included in this release.
+manifest.files = [entry];
+manifest.path = installer;
+manifest.sha512 = entry.sha512;
 manifest.rolloutHours = 0;
 manifest.releaseDate = new Date().toISOString();
 writeFileSync(manifestPath, yaml.dump(manifest));

@@ -70,7 +70,7 @@ jobs:
         run: npx vitest run --project unit src/assistant-file-links/parse.test.ts src/assistant-file-links/path-open.test.ts src/file-explorer/preview-target.test.ts src/workspace/file-open/index.test.ts
       - name: Build and smoke-test Windows x64 installer
         working-directory: .upstream
-        run: npm run build:desktop -- --publish never --win --x64
+        run: npm run build:desktop -- --publish never --win --x64 -c.win.target=nsis
         env:
           PASEO_DESKTOP_SMOKE: '1'
           PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
