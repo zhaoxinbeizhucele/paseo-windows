@@ -2,7 +2,10 @@
 
 从 [getpaseo/paseo](https://github.com/getpaseo/paseo) 的最新稳定标签取源码，应用固定补丁，构建 Windows x64 安装包。此为个人维护的非官方版本。
 
-当前补丁：[PR #7711](https://github.com/getpaseo/paseo/pull/7711)，使 Windows 工作区中的 `/E:/...` 文件链接正确解析。
+当前补丁：
+
+- [PR #7711](https://github.com/getpaseo/paseo/pull/7711)：使 Windows 工作区中的 `/E:/...` 文件链接正确解析。
+- 标题栏顶部缩放区域定位修复：避免输入框已有文字时按 PgUp/PgDn 导致整个左侧栏横向偏移。浏览器回归检查空输入、普通文字、长文本及不同窗口宽度。
 
 ## 使用
 
