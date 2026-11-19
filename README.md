@@ -6,6 +6,7 @@
 
 - [PR #7711](https://github.com/getpaseo/paseo/pull/7711)：使 Windows 工作区中的 `/E:/...` 文件链接正确解析。
 - 标题栏顶部缩放区域定位修复：避免输入框已有文字时按 PgUp/PgDn 导致整个左侧栏横向偏移。浏览器回归检查空输入、普通文字、长文本及不同窗口宽度。
+- [PR #10193](https://github.com/getpaseo/paseo/pull/10193)：将内置 Antigravity Provider 升级为 `agy acp`，支持交互式权限、会话历史恢复及 MCP。
 
 ## 使用
 

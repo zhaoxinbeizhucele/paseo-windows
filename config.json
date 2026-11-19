@@ -1,7 +1,7 @@
 {
   "upstream": "getpaseo/paseo",
   "repository": "zhaoxinbeizhucele/paseo-windows",
-  "revision": 2,
+  "revision": 3,
   "patches": [
     {
       "file": "patches/7711-windows-drive-links.patch",
@@ -11,6 +11,11 @@
     {
       "file": "patches/titlebar-resizer-horizontal-overflow.patch",
       "description": "Anchor the titlebar top resizer to prevent composer paging from shifting the app horizontally"
+    },
+    {
+      "file": "patches/10193-antigravity-acp.patch",
+      "commit": "68cfad2c8a482bc9fc8901d8bdd9d9395cc56f8e",
+      "url": "https://github.com/getpaseo/paseo/pull/10193"
     }
   ]
 }
