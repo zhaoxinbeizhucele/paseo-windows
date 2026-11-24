@@ -94,7 +94,6 @@ writeFileSync(resolve(root, 'release/RELEASE-NOTES.md'), [
   '',
   '包含 Windows 盘符链接修复 [#7711](https://github.com/getpaseo/paseo/pull/7711)。',
   '修复输入框按 PgUp/PgDn 时整个左侧栏横向偏移：将标题栏顶部缩放区域固定在容器左边界。',
-  '包含 Antigravity ACP 集成（交互式权限、会话历史与 MCP 支持）[#10193](https://github.com/getpaseo/paseo/pull/10193)。',
   '更新源为本仓库；保留 Paseo 的更新提示和手动安装行为。只构建 Windows x64。',
   '',
   '此为个人维护的非官方版本，安装包没有官方代码签名，Windows 可能显示未知发布者提示。',
